@@ -55,7 +55,7 @@ export const Fragment = Symbol();
 export const Portal = Symbol();
 
 export function h(tag, data = null, children = null) {
-	// 确定 flags
+	// VNode 创建时确定其类型：flags
 	let flags = null;
 	if (typeof tag === 'string') {
 		flags = tag === 'svg' ? VNodeFlags.ELEMENT_SVG : VNodeFlags.ELEMENT_HMLT;
@@ -79,7 +79,7 @@ export function h(tag, data = null, children = null) {
 		}
 	}
 
-	// 确定 childFlags
+	// VNode 创建时确定其 children 类型： childFlags
 	let childFlags = null;
 	if (Array.isArray(children)) {
 		const { length } = children;

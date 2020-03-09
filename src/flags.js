@@ -1,3 +1,10 @@
+/**
+ * 一个 VNode 到底描述的是什么是在挂载或 patch 的时候才知道的。
+ * 这就带来了两个难题：无法从 AOT 的层面优化、开发者无法手动优化。
+ * 为了解决这个问题，我们的思路是在 VNode 创建的时候就把该 VNode 的类型通过 flags 标明
+ * 这样在挂载或 patch 阶段通过 flags 可以直接避免掉很多消耗性能的判断
+ */
+
 const VNodeFlags = {
 	ELEMENT_HMLT: 1, // html 标签
 	ELEMENT_SVG: 1 << 1, // svg 标签
@@ -23,6 +30,20 @@ VNodeFlags.COMPONENT_STATEFUL =
 // 有状态组件和函数式组件都是组件
 VNodeFlags.COMPONENT =
 	VNodeFlags.COMPONENT_STATEFUL | VNodeFlags.COMPONENT_FUNCTIONAL;
+
+
+/**
+ * 我们给 VNode 定义了 children 属性，用来存储子 VNode。大家思考一下，一个标签的子节点会有几种情况？
+ * 总的来说无非有以下几种：
+ * 没有子节点
+ * 只有一个子节点
+ * 多个子节点
+ * 有 key
+ * 无 key
+ * 不知道子节点的情况
+ * 我们可以用一个叫做 ChildrenFlags 的对象来枚举出以上这些情况，作为一个 VNode 的子节点的类型标识
+ * 为什么 children 也需要标识呢？原因只有一个：为了优化
+ */
 
 const ChildrenFlags = {
 	UNKNOWN_CHILDREN: 0, // 未知的 children 类型
