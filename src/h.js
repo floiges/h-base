@@ -59,6 +59,10 @@ export function h(tag, data = null, children = null) {
 	let flags = null;
 	if (typeof tag === 'string') {
 		flags = tag === 'svg' ? VNodeFlags.ELEMENT_SVG : VNodeFlags.ELEMENT_HMLT;
+		if (data) {
+			// 序列化 class
+			data.class = normalizedClass(data.class);
+		}
 	} else if (tag === Fragment) {
 		flags = VNodeFlags.FRAGMENT;
 	} else if (tag === Portal) {
@@ -122,7 +126,10 @@ export function h(tag, data = null, children = null) {
 function normalizedVNodes(children) {
 	const newChildren = [];
 	for (let i = 0; i < children.length; i++) {
-		const child = children[i];
+		let child = children[i];
+		// if (typeof child === 'string') { // 判断是字符串时，则表示是纯文本，则先创建纯文本对应的 VNode
+		// 	child = createTextVNode(child);
+		// }
 		if (child.key == null) {
 			// 若原来的 VNode 没有 key， 则使用竖线与该 VNode 在数组中的编号拼接作为 key
 			child.key = '|' + i;
@@ -133,7 +140,26 @@ function normalizedVNodes(children) {
 	return newChildren;
 }
 
-function createTextVNode(text) {
+function normalizedClass(classValue) {
+	// res 是最终要返回的类目字符串
+	let res = '';
+	if (typeof classValue === 'string') {
+		res = classValue;
+	} else if (Array.isArray(classValue)) {
+		for (let i = 0; i < classValue.length; i++) {
+			res += normalizedClass(classValue[i]) + ' ';
+		}
+	} else if (typeof classValue === 'object') {
+		for (const name in classValue) {
+			if (classValue[name]) {
+				res += name + ' ';
+			}
+		}
+	}
+	return res.trim();
+}
+
+export function createTextVNode(text) {
 	return {
 		_isVNode: true,
 		flags: VNodeFlags.TEXT, // 文本节点

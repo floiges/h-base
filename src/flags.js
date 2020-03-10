@@ -23,7 +23,7 @@ const VNodeFlags = {
 VNodeFlags.ELEMENT = VNodeFlags.ELEMENT_HMLT | VNodeFlags.ELEMENT_SVG;
 // 普通有状态组件、需要被 keepAlive 的有状态组件、已经被 keepAlive 的有状态组件，都属于有状态组件
 VNodeFlags.COMPONENT_STATEFUL =
-	VNodeFlags.COMPONENT_STATEFUL |
+	VNodeFlags.COMPONENT_STATEFUL_NORMAL |
 	VNodeFlags.COMPONENT_STATEFUL_SHOULD_KEEP_ALIVE |
 	VNodeFlags.COMPONENT_STATEFUL_KEPT_ALIVE;
 
