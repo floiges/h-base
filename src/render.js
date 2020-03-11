@@ -344,3 +344,46 @@ function patchChildren(
 			break;
 	}
 }
+
+/**
+ * 如果一个 DOM 元素是文本节点或注释节点，那么可以通过调用该 DOM 对象的 nodeValue 属性读取或设置文本节点(或注释节点)的内容
+ */
+function patchText(prevVNode, nextVNode) {
+	// 拿到文本元素 el，同时让 nextVNode.el 指向该文本元素
+	const el = (nextVNode.el = prevVNode.el);
+	if (prevVNode.children !== nextVNode.children) {
+		el.nodeValue = nextVNode.children;
+	}
+}
+
+/**
+ * 如果两个 VNode 的类型都是片段，则 patch 函数会调用 patchFragment 函数更新片段的内容。
+ * 实际上片段的更新是简化版的标签元素的更新，我们知道对于标签元素来说更新的过程分为两个步骤：首先需要更新标签本身的 VNodeData，其次更新其子节点。
+ * 然而由于 Fragment 没有包裹元素，只有子节点，所以我们对 Fragment 的更新本质上就是更新两个片段的“子节点”
+ */
+function patchFragment(prevVNode, nextVNode, container) {
+	// 直接调用 patchChildren 函数更新 新旧片段的子节点即可
+	patchChildren(
+		prevVNode.childFlags,
+		nextVNode.childFlags,
+		prevVNode.children,
+		nextVNode.children,
+		container,
+	);
+
+	// 更新 nextVNode.el 属性
+	// 检查新的片段的 children 类型，如果新的片段的 children 类型是单个子节点，则意味着其 vnode.children 属性的值就是 VNode 对象，所以直接将 nextVNode.children.el 赋值给 nextVNode.el 即可。
+	// 如果新的片段没有子节点，我们知道对于没有子节点的片段我们会使用一个空的文本节点占位，而 prevVNode.el 属性引用的就是该空文本节点，所以我们直接通过旧片段的 prevVNode.el 拿到该空文本元素并赋值给新片段的 nextVNode.el 即可。
+	// 如果新的片段的类型是多个子节点，则 nextVNode.children 是一个 VNode 数组，我们会让新片段的 nextVNode.el 属性引用数组中的第一个元素。实际上这段逻辑与我们在 mountFragment 函数中所实现的逻辑是一致的
+	switch (nextVNode.childFlags) {
+		case ChildrenFlags.SINGLE_VNODE:
+			nextVNode.el = nextVNode.children.el;
+			break;
+		case ChildrenFlags.NO_CHILDREN:
+			nextVNode.el = prevVNode.el;
+			break;
+		default:
+			nextVNode.el = nextVNode.children[0].el;
+			break;
+	}
+}
