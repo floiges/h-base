@@ -387,3 +387,48 @@ function patchFragment(prevVNode, nextVNode, container) {
 			break;
 	}
 }
+
+/**
+ *  Portal 的更新与 Fragment 类似，我们需要更新其子节点，
+ * 但由于 Portal 可以被到处挂载，所以新旧 Portal 的挂载目标可能不同，所以对于 Portal 的更新除了要更新其子节点之外，还要对比新旧挂载目标是否相同，
+ * 如果新的 Portal 的挂载目标变了我们就需要将 Portal 的内容从旧的容器中搬运到新的容器中
+ */
+function patchPortal(prevVNode, nextVNode) {
+	// 需要注意的是 patchChildren 的第五个参数是旧的挂载容器，也就是说即使新的 Portal 的挂载目标变了，但是在这一步的更新完成之后 Portal 的内容仍然存在于旧的容器中
+	patchChildren(
+		prevVNode.childFlags,
+		nextVNode.childFlags,
+		prevVNode.children,
+		nextVNode.children,
+		prevVNode.tag, // 注意容器元素是旧的 container
+	);
+
+	// 我们将 prevVNode.el 赋值给 nextVNode.el，这一步要比 Fragment 容易的多，因为我们知道对于 Portal 类型的 VNode 来说其 el 属性始终是一个占位的文本节点
+	nextVNode.el = prevVNode.el;
+
+	// 由于我们在更新子节点的过程中，传递给 patchChildren 函数的容器元素始终都是旧的容器元素，
+	// 所以最终结果是：更新后的子节点也存在于旧的容器中，所以我们还需要做最后一步工作，就是把旧容器内的元素都搬运到新容器中
+	// 如果新旧容器不同，才需要搬运
+	if (nextVNode.tag !== prevVNode.tag) {
+		// 获取新的容器元素，即挂载目标
+		const container =
+			typeof nextVNode.tag === 'string'
+				? document.querySelector(nextVNode.tag)
+				: nextVNode.tag;
+
+		switch (nextVNode.childFlags) {
+			case ChildrenFlags.SINGLE_VNODE:
+				// 如果新的 Portal 是单个子节点，就把该节点搬运到新容器
+				container.appendChild(nextVNode.children.el);
+				break;
+			case ChildrenFlags.NO_CHILDREN:
+				// 无子节点，不需要搬运
+				break;
+			default:
+				for (let i = 0; i < nextVNode.children.length; i++) {
+					container.appendChild(nextVNode.children[i].el);
+				}
+				break;
+		}
+	}
+}

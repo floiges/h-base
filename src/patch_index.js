@@ -1,4 +1,4 @@
-import { h, Fragment } from './h';
+import { h, Fragment, Portal } from './h';
 import render from './render';
 
 // const prevVNode = h('div', null, '旧的 VNode');
@@ -38,7 +38,6 @@ import render from './render';
 // 	render(nextVNode, document.getElementById('app'));
 // }, 3000);
 
-
 // const prevVNode = h('div', null, [
 //   h('p', null, '旧的子节点信息1'),
 //   h('p', null, '旧的子节点信息2')
@@ -55,18 +54,37 @@ import render from './render';
 //   render(nextVNode, document.getElementById('app'));
 // }, 3000);
 
-const prevVNode = h(Fragment, null, [
-  h('p', null, '旧片段子节点1'),
-  h('p', null, '旧片段子节点2')
-]);
+// const prevVNode = h(Fragment, null, [
+//   h('p', null, '旧片段子节点1'),
+//   h('p', null, '旧片段子节点2')
+// ]);
 
-const nextVNode = h(Fragment, null, [
-  h('p', null, '新片段子节点1'),
-  h('p', null, '新片段子节点2')
-]);
+// const nextVNode = h(Fragment, null, [
+//   h('p', null, '新片段子节点1'),
+//   h('p', null, '新片段子节点2')
+// ]);
+
+// render(prevVNode, document.getElementById('app'));
+
+// setTimeout(() => {
+//   render(nextVNode, document.getElementById('app'));
+// }, 3000);
+
+const prevVNode = h(
+	Portal,
+	{ target: '#old-container' },
+	h('p', null, '旧的 Portal'),
+);
+
+const nextVNode = h(
+	Portal,
+	{ target: '#new-container' },
+	h('p', null, '新的 Portal'),
+);
+console.log('nextVNode', nextVNode);
 
 render(prevVNode, document.getElementById('app'));
 
 setTimeout(() => {
-  render(nextVNode, document.getElementById('app'));
-}, 3000);
+	render(nextVNode, document.getElementById('app'));
+}, 2000);
