@@ -1,5 +1,6 @@
 import { VNodeFlags, ChildrenFlags } from './flags';
 import { createTextVNode } from './h';
+import { patchData } from './patchData';
 /**
  * 所谓渲染器，简单的说就是将 Virtual DOM 渲染成特定平台下真实 DOM 的工具(就是一个函数，通常叫 render)，
  * 渲染器的工作流程分为两个阶段：mount 和 patch，
@@ -62,58 +63,17 @@ function mount(vnode, container, isSVG) {
  * 严谨地处理 SVG 标签，我们使用 document.createElement 函数创建DOM元素，
  * 但是对于 SVG 标签，更加严谨的方式是使用 document.createElementNS 函数
  */
-
-/**
- * setAttribute 方法允许我们为 DOM 元素设置自定义属性（不会初始化同名的 property）。
- * 另外该方法也允许我们为 DOM 元素设置标准属性的值，所以我们可不可以总是使用 setAttribute 设置全部的 DOM 属性呢？答案是：不行
- * checkboxEl.setAttribute('checked', false)
- * // 等价于
- * checkboxEl.setAttribute('checked', 'false')
- * 这就指引我们有些属性不能通过 setAttribute 设置，而是应该直接通过 DOM 元素设置：el.checked = true。
- * 好在这样的属性不多，我们可以列举出来：value、checked、selected、muted。
- * 除此之外还有一些属性也需要使用 Property 的方式设置到 DOM 元素上，例如 innerHTML 和 textContent 等等
- */
-/**
- * 正则 domPropsRE 除了用来匹配我们前面说过的固定的几个属性之外，它还能匹配那些拥有大写字母的属性，这是为了匹配诸如 innerHTML、textContent 等属性设计的，
- * 同时这也顺便实现了一个特性，即拥有大写字母的属性我们都会采用 el[key] = xxx 的方式将其添加到 DOM 元素上
- */
-const domPropsRE = /\[A-Z]|^(?:value|checked|selected|muted)$/;
 function mountElement(vnode, container, isSVG) {
 	isSVG = isSVG || vnode.flags & VNodeFlags.ELEMENT_SVG;
 	const el = isSVG
 		? document.createElementNS('http://www.w3.org/2000/svg', vnode.tag)
 		: document.createElement(vnode.tag);
 	vnode.el = el; // 引用真实 dom 元素
-	// 这种 VNodeData
+	// 处理 VNodeData
 	const data = vnode.data;
 	if (data) {
 		for (let key in data) {
-			switch (key) {
-				case 'style': // 设置样式
-					for (let k in data.style) {
-						el.style[k] = data.style[k];
-					}
-					break;
-				case 'class':
-					if (isSVG) {
-						el.setAttribute('class', data[key]);
-					} else {
-						el.className = data[key];
-					}
-					break;
-				default:
-					if (key[0] === 'o' && key[1] === 'n') {
-						// 以 on 开头的作文事件处理
-						el.addEventListener(key.slice(2), data[key]);
-					} else if (domPropsRE.test(key)) {
-						// 当作 DOM Prop 处理
-						el[key] = data[key];
-					} else {
-						// 当做 Attr 处理
-						el.setAttribute(key, data[key]);
-					}
-					break;
-			}
+			patchData(el, key, null, data[key]);
 		}
 	}
 
@@ -186,56 +146,118 @@ function mountFragment(vnode, container, isSVG) {
  * 但目前来说，我们用一个空的文本节点占位即可
  */
 function mountPortal(vnode, container) {
-  const { tag, children, childFlags } = vnode;
+	const { tag, children, childFlags } = vnode;
 
-  // 获取挂载点
-  const target = typeof tag === 'string' ? document.querySelector(tag) : tag;
-  if (childFlags & ChildrenFlags.SINGLE_VNODE) {
-    // 将children 挂载到 target 上，而不是 container
-    mount(children, target);
-  } else if (childFlags & ChildrenFlags.MULTIPLE_VNODES) {
-    for (let i = 0; i < children.length; i++) {
-      mount(children[i], target);
-    }
-  }
+	// 获取挂载点
+	const target = typeof tag === 'string' ? document.querySelector(tag) : tag;
+	if (childFlags & ChildrenFlags.SINGLE_VNODE) {
+		// 将children 挂载到 target 上，而不是 container
+		mount(children, target);
+	} else if (childFlags & ChildrenFlags.MULTIPLE_VNODES) {
+		for (let i = 0; i < children.length; i++) {
+			mount(children[i], target);
+		}
+	}
 
-  // 占位的空文本节点
-  const plageholder = createTextVNode('');
-  // 将占位节点挂载到 container
-  mountText(plageholder, container);
-  // el 属性引用该占位节点
-  vnode.el = plageholder.el;
+	// 占位的空文本节点
+	const plageholder = createTextVNode('');
+	// 将占位节点挂载到 container
+	mountText(plageholder, container);
+	// el 属性引用该占位节点
+	vnode.el = plageholder.el;
 }
 
 function mountComponent(vnode, container, isSVG) {
-  if (vnode.flags & VNodeFlags.COMPONENT_STATEFUL) {
-    // 挂载有状态组件
-    mountStatefulComponent(vnode, container, isSVG);
-  } else {
-    // 挂载函数式组件
-    mountFunctionalComponent(vnode, container, isSVG);
-  }
+	if (vnode.flags & VNodeFlags.COMPONENT_STATEFUL) {
+		// 挂载有状态组件
+		mountStatefulComponent(vnode, container, isSVG);
+	} else {
+		// 挂载函数式组件
+		mountFunctionalComponent(vnode, container, isSVG);
+	}
 }
 
 function mountStatefulComponent(vnode, container, isSVG) {
-  // 如果一个 VNode 描述的是有状态组件，那么 vnode.tag 属性值就是组件类的引用，所以通过 new 关键字创建组件实例
-  const instance = new vnode.tag();
-  // 一个组件的核心就是其 render 函数，通过调用 render 函数可以拿到该组件要渲染的内容
-  instance.$vnode = instance.render();
-  // 挂载
-  mount(instance.$vnode, container, isSVG);
-  // el 属性和组件实例的 $el 属性都引用组件的根 DOM 元素
-  instance.$el = vnode.el = instance.$vnode.el;
+	// 如果一个 VNode 描述的是有状态组件，那么 vnode.tag 属性值就是组件类的引用，所以通过 new 关键字创建组件实例
+	const instance = new vnode.tag();
+	// 一个组件的核心就是其 render 函数，通过调用 render 函数可以拿到该组件要渲染的内容
+	instance.$vnode = instance.render();
+	// 挂载
+	mount(instance.$vnode, container, isSVG);
+	// el 属性和组件实例的 $el 属性都引用组件的根 DOM 元素
+	instance.$el = vnode.el = instance.$vnode.el;
 }
 
 /**
  * 在挂载函数式组件的时候，比挂载有状态组件少了一个实例化的过程，如果一个 VNode 描述的是函数式组件，那么其 tag 属性值就是该函数的引用
  */
 function mountFunctionalComponent(vnode, container, isSVG) {
-  // 获取 VNode
-  const $vnode = vnode.tag();
-  // 挂载
-  mount($vnode, container, isSVG);
-  // el 引用该组件的根元素
-  vnode.el = $vnode.el;
+	// 获取 VNode
+	const $vnode = vnode.tag();
+	// 挂载
+	mount($vnode, container, isSVG);
+	// el 引用该组件的根元素
+	vnode.el = $vnode.el;
+}
+
+function patch(prevVNode, nextVNode, container) {
+	const nextFlags = nextVNode.flags;
+	const prevFlags = prevVNode.flags;
+
+	if (prevFlags !== nextFlags) {
+		// 直接替换
+		replaceVNode(prevVNode, nextVNode, container);
+	} else if (nextFlags & VNodeFlags.ELEMENT) {
+		patchElement(prevVNode, nextVNode, container);
+	} else if (nextFlags & VNodeFlags.COMPONENT) {
+		patchComponent(prevVNode, nextVNode, container);
+	} else if (nextFlags & VNodeFlags.TEXT) {
+		patchText(prevVNode, nextVNode);
+	} else if (nextFlags & VNodeFlags.FRAGMENT) {
+		patchFragment(prevVNode, nextVNode, container);
+	} else if (nextFlags & VNodeFlags.PORTAL) {
+		patchPortal(prevVNode, nextVNode);
+	}
+}
+
+function replaceVNode(prevVNode, nextVNode, container) {
+	// 将旧的 VNode 所渲染的 DOM 从容器中移除
+	container.removeChild(prevVNode.el);
+	// 挂载新的 VNode
+	mount(nextVNode, container);
+}
+
+/**
+ * 首先即使两个 VNode 的类型同为标签元素，但它们也可能是不同的标签，也就是说它们的 tag 属性值不尽相同。
+ * 这就又引申出了一条更新原则：我们认为不同的标签渲染的内容不同，
+ * 例如 ul 标签下只能渲染 li 标签，所以拿 ul 标签和一个 div 标签进行比对是没有任何意义的，
+ * 这种情况下我们不会对旧的标签元素打补丁，而是使用新的标签元素替换旧的标签元素
+ */
+function patchElement(prevVNode, nextVNode, container) {
+	// 新旧 VNode 描述的标签不同，则直接替换
+	if (prevVNode.tag !== nextVNode.tag) {
+		replaceVNode(prevVNode, nextVNode, container);
+		return;
+	}
+
+	// 拿到 el，注意这时要让 nextVNode.el 也引用该元素
+	const el = (nextVNode.el = prevVNode.el);
+	const prevData = prevVNode.data;
+	const nextData = nextVNode.data;
+
+	if (nextData) {
+		for (let key in nextData) {
+			const prevValue = prevData[key];
+			const nextValue = nextData[key];
+			patchData(el, key, prevValue, nextValue);
+		}
+	}
+	if (prevData) {
+		for (let key in prevData) {
+			const prevValue = prevData[key];
+			if (prevValue && !nextData.hasOwnProperty(key)) {
+				patchData(el, key, prevValue, null);
+			}
+		}
+	}
 }
