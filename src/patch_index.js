@@ -89,20 +89,71 @@ import render from './render';
 // 	render(nextVNode, document.getElementById('app'));
 // }, 2000);
 
-class MyComponent {
-  localState = "one";
+// class MyComponent {
+//   localState = "one";
+
+//   mounted() {
+//     setTimeout(() => {
+//       this.localState = 'two';
+//       this._update();
+//     }, 2000);
+//   }
+
+//   render() {
+//     return h('div', null, this.localState);
+//   }
+// }
+
+// const compVNode = h(MyComponent);
+// render(compVNode, document.getElementById('app'));
+
+// class ChildComponent {
+// 	render() {
+// 		return h('div', null, this.$props.text);
+// 	}
+// }
+
+// class ParentComponent {
+// 	localState = 'one';
+
+// 	render() {
+// 		return h(ChildComponent, {
+// 			text: this.localState,
+// 		});
+// 	}
+// }
+
+// const compVNode = h(ParentComponent);
+// console.log("compVNode", compVNode)
+
+// render(compVNode, document.getElementById('app'));
+
+class ChildComponent1 {
+	render() {
+		return h('div', null, '组件1');
+	}
+}
+
+class ChildComponent2 {
+	render() {
+		return h('div', null, '组件2');
+	}
+}
+
+class ParentComponent {
+  isTrue = true;
 
   mounted() {
     setTimeout(() => {
-      this.localState = 'two';
+      this.isTrue = false;
       this._update();
     }, 2000);
   }
 
   render() {
-    return h('div', null, this.localState);
+    return this.isTrue ? h(ChildComponent1) : h(ChildComponent2);
   }
 }
 
-const compVNode = h(MyComponent);
+const compVNode = h(ParentComponent);
 render(compVNode, document.getElementById('app'));

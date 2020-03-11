@@ -179,10 +179,16 @@ function mountComponent(vnode, container, isSVG) {
 
 function mountStatefulComponent(vnode, container, isSVG) {
 	// 如果一个 VNode 描述的是有状态组件，那么 vnode.tag 属性值就是组件类的引用，所以通过 new 关键字创建组件实例
-	const instance = new vnode.tag();
+	// 强调：VNode 的 children 属性本应该用来存储子节点，
+	// 但是对于组件类型的 VNode 来说，它的子节点都应该作为插槽存在，并且我们选择将插槽内容存储在单独的 slots 属性中，而非存储在 children 属性中，
+	// 这样 children 属性就可以用来存储组件实例了
+	const instance = (vnode.children = new vnode.tag());
+	// 初始化 props，此时假设 VNodeData 里面都是 props 数据
+	instance.$props = vnode.data;
 	// _update 函数所做的工作就是渲染组件，这样当组件自身状态发生变化后，我们就可以再次调用 _update 函数来完成组件的更新
 	instance._update = function() {
-		if (instance._mounted) { // 如果 instance._mounted 为真，说明组件已挂载，应该执行更新操作
+		if (instance._mounted) {
+			// 如果 instance._mounted 为真，说明组件已挂载，应该执行更新操作
 			// 拿到旧的 VNode
 			const prevVNode = instance.$vnode;
 			// 重渲染新的 VNode
@@ -203,7 +209,7 @@ function mountStatefulComponent(vnode, container, isSVG) {
 			// 调用 mounted 钩子
 			instance.mounted && instance.mounted();
 		}
-	}
+	};
 	instance._update();
 }
 
@@ -242,6 +248,11 @@ function patch(prevVNode, nextVNode, container) {
 function replaceVNode(prevVNode, nextVNode, container) {
 	// 将旧的 VNode 所渲染的 DOM 从容器中移除
 	container.removeChild(prevVNode.el);
+	if (prevVNode.flags & VNodeFlags.COMPONENT_STATEFUL_NORMAL) {
+		const instance = prevVNode.children;
+		console.log('replaceVNode -> prevVNode instance', instance);
+		instance.unmounted && instance.unmounted(); // 组件卸载钩子
+	}
 	// 挂载新的 VNode
 	mount(nextVNode, container);
 }
@@ -449,5 +460,20 @@ function patchPortal(prevVNode, nextVNode) {
 				}
 				break;
 		}
+	}
+}
+
+
+function patchComponent(prevVNode, nextVNode, container) {
+	// tag 属性的值是组件类，通过比较新旧组件类是否相等来判断是否是相同的组件
+	if (nextVNode.tag !== prevVNode.tag) {
+		replaceVNode(prevVNode, nextVNode, container);
+	} else if (nextVNode.flags & VNodeFlags.COMPONENT_STATEFUL_NORMAL) {
+		// 获取组件实例
+		const instance = (nextVNode.children = prevVNode.children);
+		// 更新 props
+		instance.$props = nextVNode.data;
+		// 更新组件
+		instance._update();
 	}
 }
