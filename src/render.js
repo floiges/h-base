@@ -260,4 +260,87 @@ function patchElement(prevVNode, nextVNode, container) {
 			}
 		}
 	}
+
+	// 调用 patchChildren 递归更新子节点
+	patchChildren(
+		prevVNode.childFlags,
+		nextVNode.childFlags,
+		prevVNode.children,
+		nextVNode.children,
+		el,
+	);
+}
+
+/**
+ * 子节点更新
+ * @param {*} prevChildFlags 旧 VNode 的子节点类型
+ * @param {*} nextChildFlags 新 VNode 的子节点类型
+ * @param {*} prevChildren 旧 VNode 的子节点
+ * @param {*} nextChildren 新 VNode 的子节点
+ * @param {*} container 当前标签元素，即子节点的父元素
+ */
+function patchChildren(
+	prevChildFlags,
+	nextChildFlags,
+	prevChildren,
+	nextChildren,
+	container,
+) {
+	switch (prevChildFlags) {
+		case ChildrenFlags.SINGLE_VNODE: // 旧 children 是单个子节点
+			switch (nextChildFlags) {
+				case ChildrenFlags.SINGLE_VNODE: // 新 children 是单个子节点
+					patch(prevChildren, nextChildren, container);
+					break;
+				case ChildrenFlags.NO_CHILDREN: // 新 children 没有子节点
+					container.removeChild(prevChildren.el);
+					break;
+				default:
+					// 新 children 有多个子节点
+					container.removeChild(prevChildren.el);
+					for (let i = 0; i < nextChildren.length; i++) {
+						mount(nextChildren[i], container);
+					}
+					break;
+			}
+			break;
+		case ChildrenFlags.NO_CHILDREN: // 旧 children 没有子节点
+			switch (nextChildFlags) {
+				case ChildrenFlags.SINGLE_VNODE:
+					mount(nextChildren, container);
+					break;
+				case ChildrenFlags.NO_CHILDREN:
+					break;
+				default:
+					for (let i = 0; i < nextChildren.length; i++) {
+						mount(nextChildren[i], container);
+					}
+					break;
+			}
+			break;
+		default:
+			// 旧 children 有多个子节点
+			switch (nextChildFlags) {
+				case ChildrenFlags.SINGLE_VNODE:
+					for (let i = 0; i < prevChildren.length; i++) {
+						container.removeChild(prevChildren[i].el);
+					}
+					mount(nextChildren, container);
+					break;
+				case ChildrenFlags.NO_CHILDREN:
+					for (let i = 0; i < prevChildren.length; i++) {
+						container.removeChild(prevChildren[i].el);
+					}
+					break;
+				default:
+					for (let i = 0; i < prevChildren.length; i++) {
+						container.removeChild(prevChildren[i].el);
+					}
+					for (let i = 0; i < nextChildren.length; i++) {
+						mount(nextChildren[i], container);
+					}
+					break;
+			}
+			break;
+	}
 }
