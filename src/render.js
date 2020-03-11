@@ -180,12 +180,31 @@ function mountComponent(vnode, container, isSVG) {
 function mountStatefulComponent(vnode, container, isSVG) {
 	// 如果一个 VNode 描述的是有状态组件，那么 vnode.tag 属性值就是组件类的引用，所以通过 new 关键字创建组件实例
 	const instance = new vnode.tag();
-	// 一个组件的核心就是其 render 函数，通过调用 render 函数可以拿到该组件要渲染的内容
-	instance.$vnode = instance.render();
-	// 挂载
-	mount(instance.$vnode, container, isSVG);
-	// el 属性和组件实例的 $el 属性都引用组件的根 DOM 元素
-	instance.$el = vnode.el = instance.$vnode.el;
+	// _update 函数所做的工作就是渲染组件，这样当组件自身状态发生变化后，我们就可以再次调用 _update 函数来完成组件的更新
+	instance._update = function() {
+		if (instance._mounted) { // 如果 instance._mounted 为真，说明组件已挂载，应该执行更新操作
+			// 拿到旧的 VNode
+			const prevVNode = instance.$vnode;
+			// 重渲染新的 VNode
+			const nextVNode = (instance.$vnode = instance.render());
+			// patch 更新
+			patch(prevVNode, nextVNode, prevVNode.el.parentNode);
+			// 更新 VNode.el 和 $el
+			instance.$el = vnode.el = instance.$vnode.el;
+		} else {
+			// 渲染
+			instance.$vnode = instance.render();
+			// 挂载
+			mount(instance.$vnode, container, isSVG);
+			// 组件已挂载的标识
+			instance._mounted = true;
+			// el 属性值 和 组件实例的 $el 属性都引用组件的根 DOM 元素
+			instance.$el = vnode.el = instance.$vnode.el;
+			// 调用 mounted 钩子
+			instance.mounted && instance.mounted();
+		}
+	}
+	instance._update();
 }
 
 /**

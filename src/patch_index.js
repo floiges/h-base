@@ -70,21 +70,39 @@ import render from './render';
 //   render(nextVNode, document.getElementById('app'));
 // }, 3000);
 
-const prevVNode = h(
-	Portal,
-	{ target: '#old-container' },
-	h('p', null, '旧的 Portal'),
-);
+// const prevVNode = h(
+// 	Portal,
+// 	{ target: '#old-container' },
+// 	h('p', null, '旧的 Portal'),
+// );
 
-const nextVNode = h(
-	Portal,
-	{ target: '#new-container' },
-	h('p', null, '新的 Portal'),
-);
-console.log('nextVNode', nextVNode);
+// const nextVNode = h(
+// 	Portal,
+// 	{ target: '#new-container' },
+// 	h('p', null, '新的 Portal'),
+// );
+// console.log('nextVNode', nextVNode);
 
-render(prevVNode, document.getElementById('app'));
+// render(prevVNode, document.getElementById('app'));
 
-setTimeout(() => {
-	render(nextVNode, document.getElementById('app'));
-}, 2000);
+// setTimeout(() => {
+// 	render(nextVNode, document.getElementById('app'));
+// }, 2000);
+
+class MyComponent {
+  localState = "one";
+
+  mounted() {
+    setTimeout(() => {
+      this.localState = 'two';
+      this._update();
+    }, 2000);
+  }
+
+  render() {
+    return h('div', null, this.localState);
+  }
+}
+
+const compVNode = h(MyComponent);
+render(compVNode, document.getElementById('app'));
