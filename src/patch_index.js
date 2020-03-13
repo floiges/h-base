@@ -128,30 +128,54 @@ import render from './render';
 
 // render(compVNode, document.getElementById('app'));
 
-class ChildComponent1 {
-	render() {
-		return h('div', null, '组件1');
-	}
-}
+// class ChildComponent1 {
+// 	render() {
+// 		return h('div', null, '组件1');
+// 	}
+// }
 
-class ChildComponent2 {
-	render() {
-		return h('div', null, '组件2');
-	}
+// class ChildComponent2 {
+// 	render() {
+// 		return h('div', null, '组件2');
+// 	}
+// }
+
+// class ParentComponent {
+//   isTrue = true;
+
+//   mounted() {
+//     setTimeout(() => {
+//       this.isTrue = false;
+//       this._update();
+//     }, 2000);
+//   }
+
+//   render() {
+//     return this.isTrue ? h(ChildComponent1) : h(ChildComponent2);
+//   }
+// }
+
+// const compVNode = h(ParentComponent);
+// render(compVNode, document.getElementById('app'));
+
+function MyFunctionalComponent(props) {
+	return h('div', null, props.text);
 }
 
 class ParentComponent {
-  isTrue = true;
+	localState = 'one';
 
-  mounted() {
-    setTimeout(() => {
-      this.isTrue = false;
-      this._update();
-    }, 2000);
-  }
+	mounted() {
+		setTimeout(() => {
+			this.localState = 'two';
+			this._update();
+		}, 2000);
+	}
 
-  render() {
-    return this.isTrue ? h(ChildComponent1) : h(ChildComponent2);
+	render() {
+		return h(MyFunctionalComponent, {
+			text: this.localState,
+		});
   }
 }
 

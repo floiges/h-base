@@ -160,11 +160,11 @@ function mountPortal(vnode, container) {
 	}
 
 	// 占位的空文本节点
-	const plageholder = createTextVNode('');
+	const placeholder = createTextVNode('');
 	// 将占位节点挂载到 container
-	mountText(plageholder, container);
+	mountText(placeholder, container);
 	// el 属性引用该占位节点
-	vnode.el = plageholder.el;
+	vnode.el = placeholder.el;
 }
 
 function mountComponent(vnode, container, isSVG) {
@@ -215,14 +215,52 @@ function mountStatefulComponent(vnode, container, isSVG) {
 
 /**
  * 在挂载函数式组件的时候，比挂载有状态组件少了一个实例化的过程，如果一个 VNode 描述的是函数式组件，那么其 tag 属性值就是该函数的引用
+ * 在调用组件函数获取 VNode 之前，要先获取 props，这里我们同样直接将整个 VNodeData 作为 props 数据，前面我们已经解释了这么做的原因是出于简便。
+ * 拿到 props 数据之后，在调用组件函数 vnode.tag(props) 时将 props 作为参数传递过去，这样子组件就可以通过参数访问由父组件传递过来的数据了。
+ * 另外，我们将组件产出的 VNode 赋值给了 vnode.children 属性，
+ * 这里需要做一些说明，对于有状态组件类型的 VNode 来说，我们使用其 children 属性存储组件实例，并在将来会用 slots 属性存储插槽数据。
+ * 同样的，在函数式组件中，由于函数式组件没有组件实例，所以对于函数式组件类型的 VNode，我们用其 children 属性存储组件产出的 VNode，将来也会使用 slots 属性存储插槽数据。
+ * 这个是设计上的决定，并非一定要这么做，但为了与 Vue3 的设计保持一致，所以我们就沿用 Vue3 的设计
  */
 function mountFunctionalComponent(vnode, container, isSVG) {
-	// 获取 VNode
-	const $vnode = vnode.tag();
-	// 挂载
-	mount($vnode, container, isSVG);
-	// el 引用该组件的根元素
-	vnode.el = $vnode.el;
+	// 挂载函数式组件的核心步骤只有两步：1、调用组件的定义函数，拿到组件产出的 VNode，2、将 VNode 挂载到容器元素
+	// 与挂载有状态组件类似，我们可以把这些步骤封装到一个函数中，当组件更新时再次调用这个函数即可。
+	// 但是，与有状态组件不同，函数式组件没有组件实例，所以我们没办法封装类似 instance._update 这样的函数，那应该怎么办呢？
+	// 很简单，我们把 update 函数定义在函数式组件的 VNode 上就可以了
+	vnode.handle = {
+		prev: null, // 存储旧的函数式组件 VNode，在初次挂载时，没有旧的 VNode，因此初始化 null
+		next: vnode, // 存储新的函数式组件 VNode
+		container, // 挂载容器
+		update: () => {
+			if (vnode.handle.prev) {
+				// 更新
+				// 不要搞混的是：prevVNode 和 nextVNode 是用来描述函数式组件的 VNode，并非函数式组件所产出的 VNode。
+				// 因为函数式组件所产出的 VNode 存放在用来描述函数式组件的 VNode 的 children 属性中
+				const prevVNode = vnode.handle.prev;
+				const nextVNode = vnode.handle.next;
+				// prevTree 是组件产出的旧的 VNode
+				const prevTree = prevVNode.children;
+				// 更新 props
+				const props = nextVNode.data;
+				// nextTree 组件产出的新的 VNode
+				const nextTree = (nextVNode.children = nextVNode.tag(props));
+				// 调用 patch 更新
+				patch(prevTree, nextTree, vnode.handle.container);
+			} else {
+				// 挂载
+				const props = vnode.data;
+				// 获取 VNode
+				const $vnode = (vnode.children = vnode.tag(props));
+				// 挂载
+				mount($vnode, container, isSVG);
+				// el 引用该组件的根元素
+				vnode.el = $vnode.el;
+			}
+		},
+	};
+
+	// 调用 vnode.handle.update 完成初次挂载
+	vnode.handle.update();
 }
 
 function patch(prevVNode, nextVNode, container) {
@@ -249,6 +287,8 @@ function replaceVNode(prevVNode, nextVNode, container) {
 	// 将旧的 VNode 所渲染的 DOM 从容器中移除
 	container.removeChild(prevVNode.el);
 	if (prevVNode.flags & VNodeFlags.COMPONENT_STATEFUL_NORMAL) {
+		// 对于组件来说我们不能仅仅将组件所渲染的内容移除就算大功告成
+		// 我们还有另外一件事需要做，即调用 unmounted 钩子
 		const instance = prevVNode.children;
 		console.log('replaceVNode -> prevVNode instance', instance);
 		instance.unmounted && instance.unmounted(); // 组件卸载钩子
@@ -463,8 +503,9 @@ function patchPortal(prevVNode, nextVNode) {
 	}
 }
 
-
 function patchComponent(prevVNode, nextVNode, container) {
+	console.log('patchComponent -> nextVNode', nextVNode);
+	console.log('patchComponent -> prevVNode', prevVNode);
 	// tag 属性的值是组件类，通过比较新旧组件类是否相等来判断是否是相同的组件
 	if (nextVNode.tag !== prevVNode.tag) {
 		replaceVNode(prevVNode, nextVNode, container);
@@ -475,5 +516,16 @@ function patchComponent(prevVNode, nextVNode, container) {
 		instance.$props = nextVNode.data;
 		// 更新组件
 		instance._update();
+	} else {
+		// 更新函数式组件 VNode
+		// 通过 prevVNode.handle 拿到 handle 对象
+		const handle = (nextVNode.handle = prevVNode.handle);
+		// 更新 handle 对象
+		handle.prev = prevVNode;
+		handle.next = nextVNode;
+		handle.container = container;
+
+		// 调用 update
+		handle.update();
 	}
 }
